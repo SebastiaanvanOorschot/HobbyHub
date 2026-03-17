@@ -1,7 +1,7 @@
 <template>
   <div class="hub">
     <header>
-      <h1>Seb's Hub</h1>
+      <h1>Projects</h1>
       <p>Personal projects &amp; tools</p>
     </header>
 
