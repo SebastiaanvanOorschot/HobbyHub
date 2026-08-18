@@ -36,19 +36,54 @@
         <p>Personal projects &amp; tools</p>
       </div>
 
+      <div class="terminal-dock">
+        <div class="terminal-window" :class="{ open: openId }" @mouseenter="cancelClose" @mouseleave="scheduleClose">
+          <div class="terminal" v-if="openId">
+            <button type="button" class="terminal-close" aria-label="Sluit terminal" @click="closeDetails">
+              &times;
+            </button>
+            <p v-for="(line, i) in visibleLines" :key="i" class="term-line" :class="line.type">
+              <span v-if="line.glyph" class="glyph">{{ line.glyph }}</span>
+              <span>{{ line.plain }}</span>
+              <a
+                v-if="line.linkReady"
+                :href="line.href"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="term-link"
+                >{{ line.linkText }}</a
+              ><span v-else-if="line.href">{{ line.linkShown }}</span>
+            </p>
+            <span class="cursor" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+
       <main>
-        <a
+        <div
           v-for="app in apps"
           :key="app.href"
-          :href="app.href"
-          class="card"
-          target="_blank"
-          rel="noopener noreferrer"
+          class="card-wrap"
+          @mouseenter="scheduleOpen(app)"
+          @mouseleave="scheduleClose"
         >
-          <span class="material-symbols-outlined icon" aria-hidden="true">{{ app.icon }}</span>
-          <span class="label">{{ app.label }}</span>
-          <span class="desc">{{ app.desc }}</span>
-        </a>
+          <a :href="app.href" class="card" target="_blank" rel="noopener noreferrer">
+            <span class="material-symbols-outlined icon" aria-hidden="true">{{ app.icon }}</span>
+            <span class="label">{{ app.label }}</span>
+            <span class="desc">{{ app.desc }}</span>
+          </a>
+
+          <button
+            type="button"
+            class="details-toggle"
+            :class="{ active: openId === app.href }"
+            :aria-expanded="openId === app.href"
+            :aria-label="(openId === app.href ? 'Sluit' : 'Toon') + ' details voor ' + app.label"
+            @click="toggleDetails(app)"
+          >
+            <span aria-hidden="true">&gt;_</span>
+          </button>
+        </div>
       </main>
     </div>
 
@@ -57,20 +92,164 @@
 </template>
 
 <script setup>
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { useTypewriter } from './composables/useTypewriter'
+
+function promptLine(text) {
+  return { type: 'prompt', glyph: '$', text }
+}
+
+function outputLine(text) {
+  return { type: 'output', glyph: '>', text }
+}
+
+// meta lines like "live:  https://…" — the trailing URL (href) becomes the clickable part
+function metaLine(text, href = null) {
+  return { type: 'meta', glyph: '', text, href, linkText: href }
+}
+
 const apps = [
   {
     href: 'https://calendar.sebaslive.xyz',
     icon: 'calendar_month',
     label: 'Family Calendar',
-    desc: 'Shared calendar with recurring events & weather'
+    desc: 'Shared calendar with recurring events & weather',
+    details: {
+      lines: [
+        promptLine('cat family-calendar'),
+        outputLine('A shared family agenda: recurring events via RRULE/iCal,'),
+        outputLine('Google Calendar import, import of other iCal calendars,'),
+        outputLine('a 2-week weather forecast, calendar sharing between users,'),
+        outputLine('and Google sign-in.'),
+        metaLine('stack: Vue.js · ASP.NET (C#)'),
+        metaLine('live:  https://calendar.sebaslive.xyz', 'https://calendar.sebaslive.xyz'),
+        metaLine(
+          'code:  https://github.com/SebastiaanvanOorschot/illAdvisedCalendarApp',
+          'https://github.com/SebastiaanvanOorschot/illAdvisedCalendarApp'
+        )
+      ]
+    }
   },
   {
     href: 'https://secretshare.sebaslive.xyz',
     icon: 'lock_person',
     label: 'Secret Share',
-    desc: 'Share sensitive info via one-time encrypted links'
+    desc: 'Share sensitive info via one-time encrypted links',
+    details: {
+      lines: [
+        promptLine('cat secret-share'),
+        outputLine('Share sensitive info via one-time encrypted links.'),
+        outputLine('Built to practice encryption and to share passwords'),
+        outputLine('securely at work.'),
+        metaLine('stack: Vue.js · ASP.NET (C#)'),
+        metaLine('live:  https://secretshare.sebaslive.xyz', 'https://secretshare.sebaslive.xyz'),
+        metaLine(
+          'code:  https://github.com/SebastiaanvanOorschot/SecretShareApp',
+          'https://github.com/SebastiaanvanOorschot/SecretShareApp'
+        )
+      ]
+    }
   }
 ]
+
+const openId = ref(null)
+const typewriter = useTypewriter()
+
+const CLOSE_DELAY = 250
+let closeTimer = null
+
+function prefersReducedMotion() {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+}
+
+function supportsHover() {
+  return window.matchMedia?.('(hover: hover)').matches ?? false
+}
+
+function clearCloseTimer() {
+  if (closeTimer) {
+    clearTimeout(closeTimer)
+    closeTimer = null
+  }
+}
+
+function openDetails(app) {
+  clearCloseTimer()
+  if (openId.value === app.href) return
+
+  openId.value = app.href
+  const fullTexts = app.details.lines.map((line) => line.text)
+  typewriter.start(fullTexts, { instant: prefersReducedMotion() })
+}
+
+function closeDetails() {
+  clearCloseTimer()
+  openId.value = null
+  typewriter.stop()
+}
+
+function toggleDetails(app) {
+  if (openId.value === app.href) {
+    closeDetails()
+    return
+  }
+  openDetails(app)
+}
+
+// Desktop-only bonus trigger — gated so touch devices never open on tap-hover.
+function scheduleOpen(app) {
+  if (!supportsHover()) return
+  openDetails(app)
+}
+
+function cancelClose() {
+  clearCloseTimer()
+}
+
+function scheduleClose() {
+  if (!supportsHover()) return
+  clearCloseTimer()
+  closeTimer = setTimeout(closeDetails, CLOSE_DELAY)
+}
+
+const visibleLines = computed(() => {
+  const app = apps.find((a) => a.href === openId.value)
+  if (!app) return []
+
+  return app.details.lines.map((line, i) => {
+    const revealedCount = typewriter.revealed.value[i] ?? 0
+
+    if (!line.href) {
+      return {
+        type: line.type,
+        glyph: line.glyph,
+        plain: line.text.slice(0, revealedCount),
+        href: null
+      }
+    }
+
+    const labelLen = line.text.length - line.linkText.length
+    const plain = line.text.slice(0, Math.min(revealedCount, labelLen))
+    const linkChars = Math.max(0, revealedCount - labelLen)
+    const linkShown = line.linkText.slice(0, linkChars)
+    const linkReady = revealedCount >= line.text.length
+
+    return {
+      type: line.type,
+      glyph: line.glyph,
+      plain,
+      href: line.href,
+      linkText: line.linkText,
+      linkShown,
+      linkReady
+    }
+  })
+})
+
+onBeforeUnmount(() => {
+  typewriter.stop()
+  clearCloseTimer()
+})
 </script>
 
 <style>
@@ -93,6 +272,9 @@ const apps = [
   --text-muted: #94a3b8;
   --text-subtle: #64748b;
   --text-faint: #334155;
+
+  /* terminal */
+  --terminal-bg: #060a10;
 }
 
 *, *::before, *::after {
@@ -215,10 +397,16 @@ body {
 main {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 1rem;
   justify-content: center;
   max-width: 800px;
   width: 100%;
+}
+
+.card-wrap {
+  position: relative;
+  width: 220px;
 }
 
 .card {
@@ -232,7 +420,7 @@ main {
   border-radius: 12px;
   text-decoration: none;
   color: inherit;
-  width: 220px;
+  width: 100%;
   transition: border-color 0.15s, transform 0.15s, background 0.15s;
   cursor: pointer;
   /* De kaart krijgt een eigen compositor-laag (translate3d + will-change), zodat de
@@ -273,11 +461,166 @@ main {
   color: var(--text-subtle);
   text-align: center;
   line-height: 1.6;
+  /* reserveert ruimte voor 3 regels, zodat kaarten altijd gelijk hoog zijn
+     ongeacht beschrijvingslengte of een geopend detailpaneel op een buurkaart */
+  min-height: calc(1.6em * 3);
+}
+
+.details-toggle {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-subtle);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.details-toggle:hover,
+.details-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.details-toggle.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Zero-height anchor: participates in the flex flow so it sits between the
+   intro and the cards, but never itself pushes them apart. The floating
+   window inside is absolutely positioned, so opening/closing it causes no
+   reflow of the surrounding layout. */
+.terminal-dock {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  height: 0;
+}
+
+.terminal-window {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(560px, 92vw);
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 20;
+  transition: opacity 0.2s ease, max-height 0.3s ease;
+}
+
+.terminal-window.open {
+  max-height: min(60vh, 420px);
+  opacity: 1;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.terminal {
+  position: relative;
+  padding: 1.5rem 1rem 1.1rem;
+  background: var(--terminal-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.72rem;
+  line-height: 1.7;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.terminal-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-subtle);
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.terminal-close:hover,
+.terminal-close:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.term-line {
+  white-space: pre-wrap;
+}
+
+.term-line .glyph {
+  color: var(--accent);
+  font-weight: 700;
+  margin-right: 0.45em;
+}
+
+.term-line.output {
+  color: var(--text-muted);
+}
+
+.term-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-soft);
+}
+
+.term-link:hover {
+  text-decoration-color: var(--accent);
+}
+
+.cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 0.15em;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 footer {
   color: var(--text-faint);
   font-size: 0.72rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-window {
+    transition: none;
+  }
+
+  .cursor {
+    animation: none;
+  }
 }
 
 @media (max-width: 520px) {
@@ -292,6 +635,19 @@ footer {
 
   .intro h1 {
     font-size: 1.75rem;
+  }
+
+  .terminal-window {
+    width: 94vw;
+  }
+
+  .terminal-window.open {
+    max-height: min(50vh, 320px);
+  }
+
+  .terminal {
+    font-size: 0.68rem;
+    padding: 1.4rem 0.85rem 1rem;
   }
 }
 </style>
