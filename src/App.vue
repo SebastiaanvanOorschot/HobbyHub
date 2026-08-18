@@ -1,24 +1,56 @@
 <template>
   <div class="hub">
-    <header>
-      <h1>Projects</h1>
-      <p>Personal projects &amp; tools</p>
+    <header class="topbar">
+      <span class="brand">sebaslive</span>
+
+      <nav class="topbar-actions">
+        <a
+          class="ghost-button"
+          href="https://github.com/SebastiaanvanOorschot"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              fill="currentColor"
+              d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23a11.52 11.52 0 0 1 3-.405c1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
+            />
+          </svg>
+          <span>GitHub</span>
+        </a>
+
+        <a
+          class="cv-button"
+          href="https://resume.sebaslive.xyz"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Curriculum Vitae
+        </a>
+      </nav>
     </header>
 
-    <main>
-      <a
-        v-for="app in apps"
-        :key="app.href"
-        :href="app.href"
-        class="card"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <span class="icon">{{ app.icon }}</span>
-        <span class="label">{{ app.label }}</span>
-        <span class="desc">{{ app.desc }}</span>
-      </a>
-    </main>
+    <div class="content">
+      <div class="intro">
+        <h1>Projects</h1>
+        <p>Personal projects &amp; tools</p>
+      </div>
+
+      <main>
+        <a
+          v-for="app in apps"
+          :key="app.href"
+          :href="app.href"
+          class="card"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span class="material-symbols-outlined icon" aria-hidden="true">{{ app.icon }}</span>
+          <span class="label">{{ app.label }}</span>
+          <span class="desc">{{ app.desc }}</span>
+        </a>
+      </main>
+    </div>
 
     <footer>sebaslive.xyz</footer>
   </div>
@@ -28,26 +60,41 @@
 const apps = [
   {
     href: 'https://calendar.sebaslive.xyz',
-    icon: '📅',
+    icon: 'calendar_month',
     label: 'Family Calendar',
     desc: 'Shared calendar with recurring events & weather'
   },
   {
     href: 'https://secretshare.sebaslive.xyz',
-    icon: '🔒',
+    icon: 'lock_person',
     label: 'Secret Share',
     desc: 'Share sensitive info via one-time encrypted links'
-  },
-  {
-    href: 'https://resume.sebaslive.xyz',
-    icon: '📄',
-    label: 'Resume',
-    desc: 'Professional background & experience'
   }
 ]
 </script>
 
 <style>
+:root {
+  /* surfaces */
+  --bg: #0a0e14;
+  --surface: #111823;
+  --surface-hover: #132030;
+  --border: #1e2937;
+  --border-hover: var(--accent);
+
+  /* accent */
+  --accent: #10b981;
+  --accent-soft: rgba(16, 185, 129, 0.12);
+
+  /* text */
+  --text: #e2e8f0;
+  --text-heading: #f8fafc;
+  --text-strong: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --text-faint: #334155;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -55,9 +102,9 @@ const apps = [
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #0f1117;
-  color: #e2e8f0;
+  font-family: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--bg);
+  color: var(--text);
   min-height: 100vh;
 }
 
@@ -66,26 +113,103 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 1.25rem 2rem 2rem;
+  gap: 2rem;
+}
+
+.topbar {
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.ghost-button,
+.cv-button {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.ghost-button {
+  gap: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.ghost-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.button-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.cv-button {
+  padding: 0.4rem 1rem;
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+}
+
+.cv-button:hover {
+  background: var(--accent-soft);
+}
+
+.content {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  padding: 2rem;
   gap: 2.5rem;
 }
 
-header {
+.intro {
   text-align: center;
 }
 
-header h1 {
-  font-size: 2.5rem;
+.intro h1 {
+  font-size: 2.25rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #f8fafc;
+  letter-spacing: -0.03em;
+  color: var(--text-heading);
 }
 
-header p {
-  margin-top: 0.5rem;
-  color: #94a3b8;
-  font-size: 1rem;
+.intro p {
+  margin-top: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
 main {
@@ -101,44 +225,73 @@ main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 2rem 1.5rem;
-  background: #1e2433;
-  border: 1px solid #2d3748;
+  gap: 0.75rem;
+  padding: 2rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   text-decoration: none;
   color: inherit;
   width: 220px;
   transition: border-color 0.15s, transform 0.15s, background 0.15s;
   cursor: pointer;
+  /* De kaart krijgt een eigen compositor-laag (translate3d + will-change), zodat de
+     tekst één keer gerasterd wordt en tijdens de hover-lift als geheel meeschuift.
+     Zonder dit wordt de tekst elke frame op een subpixel-offset opnieuw geantialiast,
+     wat er uitziet alsof de letters trillen. */
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .card:hover {
-  border-color: #4f8ef7;
-  background: #1a2540;
-  transform: translateY(-2px);
+  border-color: var(--border-hover);
+  background: var(--surface-hover);
+  transform: translate3d(0, -2px, 0);
 }
 
-.icon {
+/* kaart-iconen: Material Symbols Outlined, dun (wght 300) en niet gevuld (FILL 0),
+   zodat ze bij de strakke terminal-look passen. Eén regel = alle iconen consistent. */
+.material-symbols-outlined.icon {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
   font-size: 2rem;
+  line-height: 1;
+  color: var(--accent);
+  user-select: none;
 }
 
 .label {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #f1f5f9;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
   text-align: center;
 }
 
 .desc {
-  font-size: 0.8rem;
-  color: #64748b;
+  font-size: 0.72rem;
+  color: var(--text-subtle);
   text-align: center;
-  line-height: 1.4;
+  line-height: 1.6;
 }
 
 footer {
-  color: #334155;
-  font-size: 0.8rem;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 520px) {
+  .hub {
+    padding: 1.25rem 1rem 2rem;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .intro h1 {
+    font-size: 1.75rem;
+  }
 }
 </style>
