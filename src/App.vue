@@ -92,7 +92,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useTypewriter } from './composables/useTypewriter'
 
 function promptLine(text) {
@@ -155,6 +155,11 @@ const apps = [
 const openId = ref(null)
 const typewriter = useTypewriter()
 
+// A click-opened panel is "pinned": it ignores hover/mouse-leave entirely and
+// closes only via the close button, pressing the toggle again, or a click
+// outside the window.
+const pinned = ref(false)
+
 const CLOSE_DELAY = 250
 let closeTimer = null
 
@@ -185,20 +190,22 @@ function openDetails(app) {
 function closeDetails() {
   clearCloseTimer()
   openId.value = null
+  pinned.value = false
   typewriter.stop()
 }
 
 function toggleDetails(app) {
-  if (openId.value === app.href) {
+  if (openId.value === app.href && pinned.value) {
     closeDetails()
     return
   }
   openDetails(app)
+  pinned.value = true
 }
 
 // Desktop-only bonus trigger — gated so touch devices never open on tap-hover.
 function scheduleOpen(app) {
-  if (!supportsHover()) return
+  if (!supportsHover() || pinned.value) return
   openDetails(app)
 }
 
@@ -207,9 +214,16 @@ function cancelClose() {
 }
 
 function scheduleClose() {
-  if (!supportsHover()) return
+  if (!supportsHover() || pinned.value) return
   clearCloseTimer()
   closeTimer = setTimeout(closeDetails, CLOSE_DELAY)
+}
+
+function handleOutsideClick(event) {
+  if (!openId.value) return
+  const target = event.target
+  if (target.closest('.terminal-window') || target.closest('.details-toggle')) return
+  closeDetails()
 }
 
 const visibleLines = computed(() => {
@@ -246,7 +260,10 @@ const visibleLines = computed(() => {
   })
 })
 
+onMounted(() => document.addEventListener('click', handleOutsideClick))
+
 onBeforeUnmount(() => {
+  document.removeEventListener('click', handleOutsideClick)
   typewriter.stop()
   clearCloseTimer()
 })
