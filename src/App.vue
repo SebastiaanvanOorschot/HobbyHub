@@ -54,6 +54,22 @@
                 >{{ line.linkText }}</a
               ><span v-else-if="line.href">{{ line.linkShown }}</span>
             </p>
+            <!-- Screenshot-strip, alleen voor apps met `screenshots` en pas nadat de
+                 regels klaar zijn met typen: leest als afsluitende terminal-output. -->
+            <div v-if="hasSlideshow" class="shot-reveal" :class="{ shown: showSlideshow }">
+              <div class="shot-reveal-inner">
+                <div class="shot-banner">
+                  <div
+                    v-for="(slide, i) in slideshowSlides"
+                    :key="i"
+                    class="shot"
+                    :class="{ active: i === shotIndex }"
+                  >
+                    <img v-for="src in slide" :key="src" :src="src" alt="" decoding="async" />
+                  </div>
+                </div>
+              </div>
+            </div>
             <span class="cursor" aria-hidden="true"></span>
           </div>
         </div>
@@ -92,8 +108,22 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useTypewriter } from './composables/useTypewriter'
+
+// Statisch geïmporteerd zodat Vite ze meebundelt en hasht — een kaal '/src/assets/…'
+// pad werkt alleen in dev en breekt in de productie-build.
+import shot1 from './assets/1.webp'
+import shot2 from './assets/2.webp'
+import shot3 from './assets/3.webp'
+import shot4 from './assets/4.webp'
+import shot5 from './assets/5.webp'
+import shot6 from './assets/6.webp'
+import shot7 from './assets/7.webp'
+
+// Elke slide is een groepje shots. 3 en 4 zijn staande, mobiele schermen: naast
+// elkaar vullen ze het brede vlak beter dan ieder op zichzelf.
+const calendarSlides = [[shot1], [shot2], [shot3, shot4], [shot5], [shot6], [shot7]]
 
 function promptLine(text) {
   return { type: 'prompt', glyph: '$', text }
@@ -126,8 +156,10 @@ const apps = [
         metaLine(
           'code:  https://github.com/SebastiaanvanOorschot/illAdvisedCalendarApp',
           'https://github.com/SebastiaanvanOorschot/illAdvisedCalendarApp'
-        )
-      ]
+        ),
+        metaLine('note:  Only accessible on request through Google login')
+      ],
+      screenshots: calendarSlides
     }
   },
   {
@@ -163,6 +195,16 @@ const pinned = ref(false)
 const CLOSE_DELAY = 250
 let closeTimer = null
 
+const SHOT_INTERVAL = 2500
+const shotIndex = ref(0)
+let shotTimer = null
+
+// Peilt of slide 1 te schilderen is. Zonder dit begon de 2.5s-cyclus al terwijl
+// het beeld nog stond te decoderen, waardoor slide 1 in de eerste ronde maar een
+// fractie in beeld was en meteen doorsprong.
+const shotsReady = ref(false)
+let preloadToken = 0
+
 function prefersReducedMotion() {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 }
@@ -178,11 +220,53 @@ function clearCloseTimer() {
   }
 }
 
+function loadImage(src) {
+  const img = new Image()
+  img.src = src
+  // decode() wacht tot het beeld ook echt te schilderen is, niet alleen binnen.
+  if (typeof img.decode === 'function') return img.decode().catch(() => {})
+  return new Promise((resolve) => {
+    img.onload = resolve
+    img.onerror = resolve
+  })
+}
+
+function preloadSlides(slides) {
+  const token = ++preloadToken
+  shotsReady.value = false
+  if (!slides.length) return
+
+  // Zelfde URL's als de dichtgevouwen <img>'s, dus dit deelt hun cache-entry en
+  // kost geen extra verkeer; alleen de eerste slide bepaalt wanneer we opengaan.
+  Promise.all(slides[0].map(loadImage)).then(() => {
+    if (token === preloadToken) shotsReady.value = true
+  })
+}
+
+function stopSlideshow() {
+  if (shotTimer) {
+    clearInterval(shotTimer)
+    shotTimer = null
+  }
+  shotIndex.value = 0
+}
+
+function startSlideshow(count) {
+  stopSlideshow()
+  // Bij reduced motion blijft het op de eerste afbeelding staan — geen cyclus, geen fade.
+  if (count < 2 || prefersReducedMotion()) return
+  shotTimer = setInterval(() => {
+    shotIndex.value = (shotIndex.value + 1) % count
+  }, SHOT_INTERVAL)
+}
+
 function openDetails(app) {
   clearCloseTimer()
   if (openId.value === app.href) return
 
+  stopSlideshow()
   openId.value = app.href
+  preloadSlides(app.details.screenshots ?? [])
   const fullTexts = app.details.lines.map((line) => line.text)
   typewriter.start(fullTexts, { instant: prefersReducedMotion() })
 }
@@ -192,6 +276,7 @@ function closeDetails() {
   openId.value = null
   pinned.value = false
   typewriter.stop()
+  stopSlideshow()
 }
 
 function toggleDetails(app) {
@@ -260,12 +345,33 @@ const visibleLines = computed(() => {
   })
 })
 
+const slideshowSlides = computed(() => {
+  const app = apps.find((a) => a.href === openId.value)
+  return app?.details.screenshots ?? []
+})
+
+// Het strip-blok staat vanaf het openen in de DOM (dichtgevouwen, zodat het geen
+// hoogte kost en de shots alvast kunnen laden); `showSlideshow` klapt het open.
+const hasSlideshow = computed(() => slideshowSlides.value.length > 0)
+
+const showSlideshow = computed(
+  () => hasSlideshow.value && typewriter.isDone.value && shotsReady.value
+)
+
+// Eén bron van waarheid voor de interval: zichtbaar → draaien, onzichtbaar → opruimen.
+// Dekt sluiten, wisselen naar de andere kaart en de kaart zonder screenshots.
+watch(showSlideshow, (visible) => {
+  if (visible) startSlideshow(slideshowSlides.value.length)
+  else stopSlideshow()
+})
+
 onMounted(() => document.addEventListener('click', handleOutsideClick))
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleOutsideClick)
   typewriter.stop()
   clearCloseTimer()
+  stopSlideshow()
 })
 </script>
 
@@ -541,7 +647,7 @@ main {
 }
 
 .terminal-window.open {
-  max-height: min(60vh, 420px);
+  max-height: min(78vh, 620px);
   opacity: 1;
   overflow-y: auto;
   pointer-events: auto;
@@ -609,6 +715,69 @@ main {
   text-decoration-color: var(--accent);
 }
 
+/* --- screenshot-strip ------------------------------------------------------
+   Afsluitende "output" onder de getypte regels. Het window staat recht en zonder
+   rand — het clipt alleen; de kanteling zit op de afbeelding erbinnen. */
+
+/* Het paneel is verankerd op bottom: 0 en groeit dus omhoog. Een strip die in één
+   frame bestaat, schiet de bovenrand met een sprong omhoog. De 0fr→1fr grid-truc
+   animeert wél een auto hoogte, zodat de terminal openvouwt in plaats van springt. */
+.shot-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
+}
+
+.shot-reveal.shown {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.shot-reveal-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.shot-banner {
+  position: relative;
+  margin: 0.9rem 0 0.45rem;
+  /* Hoger dan een strip, want de shots worden nu volledig getoond: de
+     weergavehoogte van een contain-afbeelding is de hoogte van dit vlak. */
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  /* Geen eigen vlak — de letterbox-ruimte naast de smallere shots is gewoon
+     terminal, zodat de foto's in het paneel lijken te zweven. */
+  background: transparent;
+}
+
+.shot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  /* Vaste, lichte kanteling van de slide zelf — geen animatie. Een gekantelde
+     w×h-foto is (w·sinθ + h·cosθ) hoog; bij de breedste shot loopt dat 5.5% over
+     de vlakhoogte heen, dus 0.94 houdt ook de gedraaide hoeken binnen het vlak
+     in plaats van ze weg te clippen. Een paar telt als één compositie en kantelt
+     dus als geheel mee. */
+  transform: rotate(-2.5deg) scale(0.94);
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+
+/* Geen vaste maten: max-height laat de intrinsieke verhouding het werk doen,
+   zodat elke shot volledig in beeld blijft. */
+.shot img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.shot.active {
+  opacity: 1;
+}
+
 .cursor {
   display: inline-block;
   width: 0.55em;
@@ -638,6 +807,13 @@ footer {
   .cursor {
     animation: none;
   }
+
+  /* Geen cross-fade en geen uitvouwen; de JS laat de cyclus dan sowieso staan op
+     de eerste shot. */
+  .shot,
+  .shot-reveal {
+    transition: none;
+  }
 }
 
 @media (max-width: 520px) {
@@ -659,7 +835,7 @@ footer {
   }
 
   .terminal-window.open {
-    max-height: min(50vh, 320px);
+    max-height: min(72vh, 480px);
   }
 
   .terminal {
